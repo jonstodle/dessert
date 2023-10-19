@@ -1,7 +1,8 @@
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
+use regex::{Regex, RegexBuilder};
 use std::ffi::OsStr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -25,6 +26,8 @@ fn main() -> Result<()> {
 fn run(args: &Args) -> Result<()> {
     let rar_file = find_rar_file(&args.source_directory)?;
 
+    let destination_file_name = get_destination_file_name(&rar_file)?;
+
     Ok(())
 }
 
@@ -44,4 +47,55 @@ fn find_rar_file(source_directory: &PathBuf) -> Result<PathBuf> {
         })
         .next()
         .ok_or(anyhow!("failed to find rar file"))
+}
+
+fn get_destination_file_name(rar_file: &Path) -> Result<String> {
+    let file_name = rar_file
+        .file_stem()
+        .and_then(OsStr::to_str)
+        .ok_or(anyhow!("failed to get rar file stem"))?;
+
+    if let Some(episode_captures) =
+        Regex::new(r"(?P<name>.*)[sS](?P<season>\d{1,2}).?[eE](?P<episode>\d{1,2})")
+            .context("failed to compile episode regex")?
+            .captures(file_name)
+    {
+        let name = episode_captures
+            .name("name")
+            .map(|name| name.as_str().replace('.', " ").trim().to_string())
+            .ok_or(anyhow!("failed to get episode name from file name"))?;
+
+        let season = episode_captures
+            .name("season")
+            .map(|season| season.as_str())
+            .ok_or(anyhow!("failed to get episode season from file name"))?;
+
+        let episode = episode_captures
+            .name("episode")
+            .map(|episode| episode.as_str())
+            .ok_or(anyhow!("failed to get episode number from file name"))?;
+
+        Ok(format!("{} - S{:02}E{:02}", name, season, episode))
+    } else if let Some(movie_captures) = RegexBuilder::new(r"(?P<name>.*)\.(?P<year>\d{4})")
+        .swap_greed(true)
+        .build()
+        .context("failed to compile movie regex")?
+        .captures(file_name)
+    {
+        let name = movie_captures
+            .name("name")
+            .map(|name| name.as_str().replace('.', " ").trim().to_string())
+            .ok_or(anyhow!("failed to get movie name from file name"))?;
+
+        let year = movie_captures
+            .name("year")
+            .map(|year| year.as_str())
+            .ok_or(anyhow!("failed to get movie year from file name"))?;
+
+        Ok(format!("{} ({})", name, year))
+    } else {
+        Err(anyhow!(
+            "failed to get destination file name from rar file stem"
+        ))
+    }
 }
