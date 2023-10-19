@@ -45,7 +45,7 @@ fn verify_paths(args: &Args) -> Result<()> {
     Ok(())
 }
 
-fn find_rar_file(source_directory: &PathBuf) -> Result<PathBuf> {
+fn find_rar_file(source_directory: &Path) -> Result<PathBuf> {
     source_directory
         .read_dir()
         .context("failed to read source directory")?
