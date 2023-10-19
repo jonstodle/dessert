@@ -24,9 +24,23 @@ fn main() -> Result<()> {
 }
 
 fn run(args: &Args) -> Result<()> {
+    verify_paths(args)?;
+
     let rar_file = find_rar_file(&args.source_directory)?;
 
     let destination_file_name = get_destination_file_name(&rar_file)?;
+
+    Ok(())
+}
+
+fn verify_paths(args: &Args) -> Result<()> {
+    if !args.source_directory.is_dir() {
+        return Err(anyhow!("source directory is not a directory"));
+    }
+
+    if !args.destination_directory.is_dir() {
+        return Err(anyhow!("destination directory is not a directory"));
+    }
 
     Ok(())
 }
