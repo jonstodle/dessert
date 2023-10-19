@@ -3,6 +3,7 @@ use clap::Parser;
 use regex::{Regex, RegexBuilder};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use titlecase::titlecase;
 use unrar::Archive;
 
 #[derive(Parser, Debug)]
@@ -83,7 +84,7 @@ fn get_destination_file_name(rar_file: &Path) -> Result<String> {
     {
         let name = episode_captures
             .name("name")
-            .map(|name| name.as_str().replace('.', " ").trim().to_string())
+            .map(|name| titlecase(name.as_str().replace('.', " ").trim()))
             .ok_or(anyhow!("Failed to get episode name from file name"))?;
 
         let season = episode_captures
@@ -105,7 +106,7 @@ fn get_destination_file_name(rar_file: &Path) -> Result<String> {
     {
         let name = movie_captures
             .name("name")
-            .map(|name| name.as_str().replace('.', " ").trim().to_string())
+            .map(|name| titlecase(name.as_str().replace('.', " ").trim()))
             .ok_or(anyhow!("Failed to get movie name from file name"))?;
 
         let year = movie_captures
