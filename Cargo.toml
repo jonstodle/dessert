@@ -9,3 +9,4 @@ edition = "2021"
 anyhow = "1.0.75"
 clap = { version = "4.4.6", features = ["derive"] }
 regex = "1.10.2"
+unrar = "0.5.1"

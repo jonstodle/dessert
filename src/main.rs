@@ -3,6 +3,7 @@ use clap::Parser;
 use regex::{Regex, RegexBuilder};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use unrar::Archive;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -29,6 +30,12 @@ fn run(args: &Args) -> Result<()> {
     let rar_file = find_rar_file(&args.source_directory)?;
 
     let destination_file_name = get_destination_file_name(&rar_file)?;
+
+    extract_rar_file(
+        &rar_file,
+        &args.destination_directory,
+        &destination_file_name,
+    )?;
 
     Ok(())
 }
@@ -112,4 +119,36 @@ fn get_destination_file_name(rar_file: &Path) -> Result<String> {
             "failed to get destination file name from rar file stem"
         ))
     }
+}
+
+fn extract_rar_file(rar_file: &Path, destination_directory: &Path, file_name: &str) -> Result<()> {
+    let mut archive = Archive::new(rar_file)
+        .open_for_processing()
+        .context("failed to open rar file for processing")?;
+
+    while let Some(header) = archive.read_header().context("failed to read rar")? {
+        archive = if header.entry().is_file() {
+            let file_extension = header
+                .entry()
+                .filename
+                .extension()
+                .and_then(OsStr::to_str)
+                .map(str::to_string)
+                .ok_or(anyhow!("failed to get file extension from rar header"))?;
+
+            header
+                .extract_to(
+                    destination_directory
+                        .join(file_name)
+                        .with_extension(file_extension),
+                )
+                .context("failed to extract rar file")?;
+
+            break;
+        } else {
+            header.skip().context("failed to skip rar file header")?
+        };
+    }
+
+    Ok(())
 }
