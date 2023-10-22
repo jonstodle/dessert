@@ -5,10 +5,13 @@ use regex::{Regex, RegexBuilder};
 use simplelog::WriteLogger;
 use std::ffi::OsStr;
 use std::fs::File;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use tempfile::NamedTempFile;
 use titlecase::titlecase;
 use unrar::Archive;
+
+mod email;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -17,20 +20,39 @@ struct Args {
 
     #[clap(short, long)]
     destination_directory: PathBuf,
+
+    #[clap(short, long)]
+    email_config_file: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
-    let _log_file = set_up_logging()?;
+    let mut log_file = set_up_logging()?;
 
     let args = Args::parse();
 
-    let _file = match run(&args) {
+    let file = match run(&args) {
         Ok(file) => Some(file),
         Err(e) => {
             error!("{e}");
             None
         }
     };
+
+    let mut log = String::new();
+    log_file
+        .read_to_string(&mut log)
+        .context("Failed to read log file")?;
+
+    match args.email_config_file {
+        Some(config_file) => {
+            email::Client::init_from_file(&config_file)
+                .context("Failed to initialize email client")?
+                .send_email(file.as_deref(), log.as_str())?;
+        }
+        None => {
+            eprintln!("{log}")
+        }
+    }
 
     Ok(())
 }
