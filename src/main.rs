@@ -58,14 +58,18 @@ fn find_rar_file(source_directory: &Path) -> Result<PathBuf> {
         .read_dir()
         .context("Failed to read source directory")?
         .flatten()
-        .map(|entry| entry.path())
-        .filter(|path| path.is_file())
-        .filter_map(|path| {
-            if path.extension().and_then(OsStr::to_str).is_some() {
-                Some(path)
+        .filter_map(|entry| {
+            entry
+                .path()
+                .extension()
+                .and_then(OsStr::to_str)
+                .and_then(|ext| {
+                    if ext == "rar" {
+                        Some(entry.path())
             } else {
                 None
             }
+        })
         })
         .next()
         .ok_or(anyhow!("Failed to find rar file"))
