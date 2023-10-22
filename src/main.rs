@@ -137,15 +137,27 @@ fn extract_rar_file(rar_file: &Path, destination_directory: &Path, file_name: &s
                 .map(str::to_string)
                 .ok_or(anyhow!("Failed to get file extension from rar header"))?;
 
-            header
-                .extract_to(
-                    destination_directory
+            let destination = destination_directory
                         .join(file_name)
-                        .with_extension(file_extension),
-                )
-                .context("Failed to extract rar file")?;
+                .with_extension(file_extension);
 
+            if destination.exists() {
+                if header.entry().unpacked_size
+                    != destination
+                        .metadata()
+                        .map(|metadata| metadata.len() as usize)
+                        .context("Failed to read file size of existing destination file")?
+                {
+                    std::fs::remove_file(&destination)
+                        .context("Failed to remove existing destination file")?;
+                } else {
             break;
+                }
+            }
+
+            header
+                .extract_to(destination)
+                .context("Failed to extract rar file")?
         } else {
             header.skip().context("Failed to skip rar file header")?
         };
