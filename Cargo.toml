@@ -9,5 +9,8 @@ edition = "2021"
 anyhow = "1.0.75"
 clap = { version = "4.4.6", features = ["derive"] }
 regex = "1.10.2"
+simplelog = "0.12.1"
+tempfile = "3.8.0"
 titlecase = "2.2.1"
 unrar = "0.5.1"
+log = "0.4.20"

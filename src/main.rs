@@ -1,8 +1,12 @@
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
+use log::{error, info};
 use regex::{Regex, RegexBuilder};
+use simplelog::WriteLogger;
 use std::ffi::OsStr;
+use std::fs::File;
 use std::path::{Path, PathBuf};
+use tempfile::NamedTempFile;
 use titlecase::titlecase;
 use unrar::Archive;
 
@@ -16,29 +20,57 @@ struct Args {
 }
 
 fn main() -> Result<()> {
+    let _log_file = set_up_logging()?;
+
     let args = Args::parse();
 
-    if let Err(_e) = run(&args) {
-        todo!("send error mail (maybe include logs)")
-    }
+    let _file = match run(&args) {
+        Ok(file) => Some(file),
+        Err(e) => {
+            error!("{e}");
+            None
+        }
+    };
 
     Ok(())
 }
 
-fn run(args: &Args) -> Result<()> {
+fn set_up_logging() -> Result<File> {
+    let log_file = NamedTempFile::new().context("Failed to create log file")?;
+    let read_handle = log_file
+        .reopen()
+        .context("Failed to create read handle for log file")?;
+    WriteLogger::init(
+        simplelog::LevelFilter::Info,
+        simplelog::Config::default(),
+        log_file,
+    )
+    .context("Failed to initialize logger")?;
+
+    Ok(read_handle)
+}
+
+fn run(args: &Args) -> Result<String> {
     verify_paths(args)?;
+    info!("Verified paths");
 
     let rar_file = find_rar_file(&args.source_directory)?;
+    info!("Found rar file: {:?}", rar_file);
 
     let destination_file_name = get_destination_file_name(&rar_file)?;
+    info!(
+        "Determined destination file name: {:?}",
+        destination_file_name
+    );
 
     extract_rar_file(
         &rar_file,
         &args.destination_directory,
         &destination_file_name,
     )?;
+    info!("Extracted rar file");
 
-    Ok(())
+    Ok(destination_file_name)
 }
 
 fn verify_paths(args: &Args) -> Result<()> {
@@ -66,10 +98,10 @@ fn find_rar_file(source_directory: &Path) -> Result<PathBuf> {
                 .and_then(|ext| {
                     if ext == "rar" {
                         Some(entry.path())
-            } else {
-                None
-            }
-        })
+                    } else {
+                        None
+                    }
+                })
         })
         .next()
         .ok_or(anyhow!("Failed to find rar file"))
@@ -142,7 +174,7 @@ fn extract_rar_file(rar_file: &Path, destination_directory: &Path, file_name: &s
                 .ok_or(anyhow!("Failed to get file extension from rar header"))?;
 
             let destination = destination_directory
-                        .join(file_name)
+                .join(file_name)
                 .with_extension(file_extension);
 
             if destination.exists() {
@@ -154,8 +186,10 @@ fn extract_rar_file(rar_file: &Path, destination_directory: &Path, file_name: &s
                 {
                     std::fs::remove_file(&destination)
                         .context("Failed to remove existing destination file")?;
+                    info!("Removed existing destination file: {:?}", destination)
                 } else {
-            break;
+                    info!("Skipping existing destination file: {:?}", destination);
+                    break;
                 }
             }
 
